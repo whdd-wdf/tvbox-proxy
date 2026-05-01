@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TVBox 源管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 2rem; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: white; text-align: center; margin-bottom: 2rem; font-size: 2rem; }
+    .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h2 { color: #333; margin-bottom: 1rem; font-size: 1.2rem; }
+    input { width: 100%; padding: 0.8rem; border: 2px solid #e0e0e0; border-radius: 6px; margin-bottom: 0.5rem; font-size: 1rem; transition: border-color 0.2s; }
+    input:focus { outline: none; border-color: #667eea; }
+    button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: transform 0.2s; }
+    button:hover { transform: translateY(-2px); }
+    button:active { transform: translateY(0); }
+    .btn-group { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .btn-group button { flex: 1; }
+    .btn-delete { background: #dc3545; }
+    .btn-activate { background: #28a745; }
+    .source-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #eee; transition: background 0.2s; }
+    .source-item:hover { background: #f8f9fa; }
+    .source-item:last-child { border-bottom: none; }
+    .source-info { flex: 1; }
+    .source-name { font-weight: 600; color: #333; }
+    .source-url { color: #666; font-size: 0.85rem; word-break: break-all; margin-top: 0.2rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; }
+    .badge-active { background: #28a745; color: white; }
+    .badge-inactive { background: #e0e0e0; color: #666; }
+    .hint { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    #githubUrl { background: #f8f9fa; }
+    .loading { text-align: center; color: #666; padding: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📺 TVBox 源管理</h1>
+    
+    <div class="card">
+      <h2>添加新源</h2>
+      <input type="text" id="sourceName" placeholder="源名称 (例如：GitHub 精选)">
+      <input type="text" id="sourceUrl" placeholder="源地址 (JSON API URL 或 GitHub 链接)">
+      <button onclick="addSource()">添加源</button>
+    </div>
+
+    <div class="card">
+      <h2>从 GitHub 导入</h2>
+      <p class="hint">输入 GitHub 仓库中的 TVBox 配置文件地址</p>
+      <input type="text" id="githubUrl" placeholder="https://github.com/username/repo/blob/main/api.json">
+      <button onclick="importFromGitHub()">提取并添加</button>
+    </div>
+
+    <div class="card">
+      <h2>已配置的源</h2>
+      <div id="sourceList"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
