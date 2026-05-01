@@ -1,6 +1,0 @@
-name = "tvbox-proxy"
-compatibility_date = "2024-01-01"
-pages_functions_dir = "functions"
-
-[vars]
-DEFAULT_SOURCE = ""
