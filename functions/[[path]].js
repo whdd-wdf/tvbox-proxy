@@ -1,4 +1,4 @@
-// functions/[[path]].js - TVBox Proxy 完整版
+// functions/[[path]].js - TVBox Proxy 无密码版 + 预置源
 export async function onRequest(context) {
   var request = context.request;
   var env = context.env;
@@ -21,10 +21,7 @@ export async function onRequest(context) {
   var activeSource = '';
   try {
     activeSource = await env.TVBOX_KV.get('active_source');
-  } catch (e) {
-    // KV 未绑定时的降级处理
-    activeSource = '';
-  }
+  } catch (e) {}
 
   if (!activeSource) {
     return new Response(JSON.stringify({ error: 'No source configured. Visit / to setup.', hint: '访问 / 配置源地址' }), {
@@ -62,51 +59,61 @@ export async function onRequest(context) {
   }
 }
 
-// --- 管理界面 HTML ---
+// --- 管理界面 HTML (无密码版) ---
 function getAdminHTML() {
   return '<!DOCTYPE html>' +
     '<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
     '<title>TVBox 源管理</title>' +
     '<style>body{font-family:sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}' +
-    '.card{background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);width:100%;max-width:400px;text-align:center}' +
+    '.card{background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);width:100%;max-width:800px;text-align:center}' +
     'h1{color:#333;margin-bottom:1rem}input{width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}' +
-    'button{width:100%;padding:10px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px}' +
+    'button{width:auto;padding:10px 20px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:16px;margin:5px}' +
     'button:hover{background:#0056b3}.hidden{display:none}.error{color:red;margin-bottom:10px;display:none}' +
-    '#adminPanel{text-align:left;max-width:800px!important}.source-item{border-bottom:1px solid #eee;padding:10px 0;display:flex;justify-content:space-between;align-items:center}' +
-    '.badge{padding:2px 8px;border-radius:10px;font-size:12px;color:#fff;background:#999;margin-left:5px}.badge-active{background:#28a745}' +
-    '.btn-sm{padding:4px 8px;font-size:12px;margin-left:5px;cursor:pointer}</style></head>' +
-    '<body><div id="loginCard" class="card"><h1>🔒 TVBox 管理</h1><div id="loginError" class="error">密码错误</div>' +
-    '<input type="password" id="pwd" placeholder="密码 (默认 admin123)" onkeydown="if(event.key===\'Enter\')doLogin()">' +
-    '<button onclick="doLogin()">登录</button><p style="font-size:12px;color:#666;margin-top:10px">默认密码：admin123</p></div>' +
-    '<div id="adminPanel" class="card hidden"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">' +
-    '<h2 style="margin:0">📺 源管理</h2><button onclick="logout()" style="width:auto;background:#6c757d">退出</button></div>' +
-    '<div style="margin-bottom:1rem"><h3>添加新源</h3><input type="text" id="sName" placeholder="名称"><input type="text" id="sUrl" placeholder="源地址 URL">' +
-    '<button onclick="addSource()">添加</button></div><div style="margin-bottom:1rem"><h3>GitHub 导入</h3>' +
-    '<input type="text" id="ghUrl" placeholder="GitHub 链接"><button onclick="importGH()">提取并添加</button></div>' +
-    '<div><h3>已配置源</h3><div id="sourceList">加载中...</div></div></div>' +
+    '#adminPanel{text-align:left;max-width:900px!important;width:100%}.source-item{border-bottom:1px solid #eee;padding:15px 10px;display:flex;justify-content:space-between;align-items:center}' +
+    '.badge{padding:4px 10px;border-radius:12px;font-size:12px;color:#fff;background:#999;margin-left:8px}.badge-active{background:#28a745}.badge-inactive{background:#e0e0e0}' +
+    '.btn-sm{padding:6px 12px;font-size:13px;margin-left:8px;cursor:pointer;border:none;border-radius:4px;color:white}' +
+    '.btn-activate{background:#28a745}.btn-delete{background:#dc3545}' +
+    '.source-info{text-align:left;flex:1}' +
+    '.source-url{color:#666;font-size:13px;margin-top:4px;word-break:break-all}' +
+    '.section-title{font-size:18px;font-weight:bold;margin:20px 0 10px;color:#333;border-bottom:2px solid #007bff;padding-bottom:5px;display:inline-block}' +
+    '</style></head>' +
+    '<body><div id="adminPanel" class="card">' +
+    '<h1>📺 TVBox 源管理</h1>' +
+    '<p style="color:#666;font-size:14px;">无需密码，直接管理。当前已配置 <span id="count">0</span> 个源。</p>' +
+    
+    '<div style="margin-bottom:20px;text-align:left;padding:0 20px;">' +
+    '<div class="section-title">添加新源</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+    '<input type="text" id="sName" placeholder="名称" style="flex:1;min-width:100px;margin:0">' +
+    '<input type="text" id="sUrl" placeholder="源地址 URL" style="flex:2;min-width:200px;margin:0">' +
+    '<button onclick="addSource()" style="margin:0">添加</button>' +
+    '</div></div>' +
+
+    '<div style="margin-bottom:20px;text-align:left;padding:0 20px;">' +
+    '<div class="section-title">GitHub 导入</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+    '<input type="text" id="ghUrl" placeholder="GitHub 链接" style="flex:1;min-width:200px;margin:0">' +
+    '<button onclick="importGH()" style="margin:0">提取并添加</button>' +
+    '</div></div>' +
+
+    '<div style="text-align:left;padding:0 20px;">' +
+    '<div class="section-title">已配置源</div>' +
+    '<div id="sourceList" style="margin-top:10px;">加载中...</div>' +
+    '</div>' +
+    '</div>' +
+    
     '<script>' +
-    'window.onload=function(){var p=localStorage.getItem(\'tv_pwd\');if(p)doLogin(p)};' +
-    'function doLogin(savedPwd){var pwd=savedPwd||document.getElementById(\'pwd\').value;if(!pwd)return;fetch(\'/api/sources?password=\'+encodeURIComponent(pwd)).then(function(r){return r.json()}).then(function(d){if(d.error&&d.error!==\'No sources\'){document.getElementById(\'loginError\').style.display=\'block\'}else{localStorage.setItem(\'tv_pwd\',pwd);document.getElementById(\'loginCard\').classList.add(\'hidden\');document.getElementById(\'adminPanel\').classList.remove(\'hidden\');loadList(pwd)}}).catch(function(e){document.getElementById(\'loginCard\').classList.add(\'hidden\');document.getElementById(\'adminPanel\').classList.remove(\'hidden\');loadList(pwd)})}' +
-    'function loadList(pwd){fetch(\'/api/sources?password=\'+(pwd||\'\')).then(function(r){return r.json()}).then(function(d){var list=document.getElementById(\'sourceList\');if(!d.sources||d.sources.length===0){list.innerHTML=\'<p style="color:#666">暂无源</p>\';return}list.innerHTML=d.sources.map(function(s){var active=d.active===s.url;return\'<div class="source-item"><div><strong>\'+s.name+\'</strong><span class="badge \'+(active?\'badge-active\':\'\')+\'">\'+(active?\'使用中\':\'\')+\'</span><br><small>\'+s.url+\'</small></div><div>\'+(active?\'\':\'<button class="btn-sm" onclick="activate(\\\'\\\'\'+s.url.replace(/\'/g,"\\\\\'")+\'\\\'\\\'">激活</button>\')+\' <button class="btn-sm" onclick="del(\'+s.id+\')">删除</button></div></div>\'}).join(\'\')})}' +
-    'function addSource(){var n=document.getElementById(\'sName\').value;var u=document.getElementById(\'sUrl\').value;if(!u)return alert(\'输入 URL\');var pwd=localStorage.getItem(\'tv_pwd\');fetch(\'/api/sources?password=\'+pwd,{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({name:n||\'Source\',url:u})}).then(function(){loadList(pwd);document.getElementById(\'sUrl\').value=\'\'})}' +
-    'function activate(url){var pwd=localStorage.getItem(\'tv_pwd\');fetch(\'/api/activate?password=\'+pwd,{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({url:url})}).then(function(){loadList(pwd)})}' +
-    'function del(id){if(!confirm(\'确定？\'))return;var pwd=localStorage.getItem(\'tv_pwd\');fetch(\'/api/sources/\'+id+\'?password=\'+pwd,{method:\'DELETE\'}).then(function(){loadList(pwd)})}' +
-    'function importGH(){var u=document.getElementById(\'ghUrl\').value;if(!u.includes(\'github.com\'))return alert(\'无效链接\');var raw=u.replace(\'github.com\',\'raw.githubusercontent.com\').replace(\'/blob/\',\'/\');document.getElementById(\'sUrl\').value=raw;document.getElementById(\'sName\').value=\'GitHub Import\';alert(\'已提取，请点添加\')}' +
-    'function logout(){localStorage.removeItem(\'tv_pwd\');location.reload()}' +
+    'window.onload=function(){loadList()};' +
+    'function loadList(){fetch(\'/api/sources\').then(function(r){return r.json()}).then(function(d){var list=document.getElementById(\'sourceList\');var countSpan=document.getElementById(\'count\');if(!d.sources||d.sources.length===0){list.innerHTML=\'<p style="color:#666;text-align:center;padding:20px;">暂无源，请在上方添加。</p>\';countSpan.innerText=\'0\';return}countSpan.innerText=d.sources.length;list.innerHTML=d.sources.map(function(s){var active=d.active===s.url;return\'<div class="source-item"><div class="source-info"><strong>\'+s.name+\'</strong><span class="badge \'+(active?\'badge-active\':\'badge-inactive\')+\'">\'+(active?\'✓ 使用中\':\'未激活\')+\'</span><div class="source-url">\'+s.url+\'</div></div><div>\'+(active?\'\':\'<button class="btn-sm btn-activate" onclick="activate(\\\'\\\'\'+s.url.replace(/\'/g,"\\\\\'")+\'\\\'\\\'">激活</button>\')+\' <button class="btn-sm btn-delete" onclick="del(\'+s.id+\')">删除</button></div></div>\'}).join(\'\')})})}' +
+    'function addSource(){var n=document.getElementById(\'sName\').value;var u=document.getElementById(\'sUrl\').value;if(!u)return alert(\'请输入源地址\');fetch(\'/api/sources\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({name:n||\'Source\',url:u})}).then(function(){loadList();document.getElementById(\'sUrl\').value=\'\';document.getElementById(\'sName\').value=\'\'})}' +
+    'function activate(url){fetch(\'/api/activate\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({url:url})}).then(function(){loadList()})}' +
+    'function del(id){if(!confirm(\'确定删除此源？\'))return;fetch(\'/api/sources/\'+id,{method:\'DELETE\'}).then(function(){loadList()})}' +
+    'function importGH(){var u=document.getElementById(\'ghUrl\').value;if(!u.includes(\'github.com\'))return alert(\'请输入有效的 GitHub 地址\');var raw=u.replace(\'github.com\',\'raw.githubusercontent.com\').replace(\'/blob\',\'\').replace(\'/tree\',\'\');fetch(raw).then(function(r){if(!r.ok)throw new Error(\'无法访问\');return r.json()}).then(function(json){if(!json.spider&&!json.sites&&!json.home)throw new Error(\'非有效配置文件\');document.getElementById(\'sUrl\').value=raw;document.getElementById(\'sName\').value=\'GitHub Import\';alert(\'提取成功！请点击"添加"按钮。\')}).catch(function(e){alert(\'提取失败：\'+e.message)})}' +
     '</script></body></html>';
 }
 
-// --- API 处理逻辑 ---
+// --- API 处理逻辑 (无密码验证) ---
 function handleAPI(request, env, fullPath) {
-  var url = new URL(request.url);
-  var password = url.searchParams.get('password') || '';
-  var adminPassword = env.ADMIN_PASSWORD || 'admin123';
-
-  // 密码验证
-  if (password !== adminPassword) {
-     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-  }
-
   // GET /api/sources
   if (fullPath === '/api/sources' && request.method === 'GET') {
     return env.TVBOX_KV.get('sources', { type: 'json' }).then(function(sources) {
@@ -127,6 +134,12 @@ function handleAPI(request, env, fullPath) {
       
       return env.TVBOX_KV.get('sources', { type: 'json' }).then(function(sources) {
         sources = sources || [];
+        // 防止重复添加
+        for(var i=0; i<sources.length; i++) {
+          if(sources[i].url === sourceUrl) {
+             return new Response(JSON.stringify({ error: 'Source already exists' }), { status: 400 });
+          }
+        }
         sources.push({ name: name, url: sourceUrl, id: Date.now() });
         return env.TVBOX_KV.put('sources', JSON.stringify(sources)).then(function() {
           return env.TVBOX_KV.get('active_source').then(function(active) {
