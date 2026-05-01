@@ -1,15 +1,20 @@
-// functions/index.js - 首页与管理界面入口
+// functions/index.js - 首页与管理界面入口 (修复版)
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  // 简单的密码验证逻辑 (通过 URL 参数 ?password=xxx 或 Cookie)
-  const password = url.searchParams.get('password') || request.headers.get('Cookie)?.split('tvbox_pwd=')?.[1]?.split(';')?.[0];
-  const correctPassword = env.ADMIN_PASSWORD || 'admin123'; // 默认密码 admin123
+  // 获取密码 (从 URL 参数或 Cookie)
+  let password = url.searchParams.get('password') || '';
+  
+  // 从 Cookie 中解析密码
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const cookieMatch = cookieHeader.match(/tvbox_pwd=([^;]+)/);
+  if (cookieMatch) {
+    password = cookieMatch[1];
+  }
 
-  // 如果未设置密码且是首次访问，引导设置密码
-  // 如果已设置密码但未提供或错误，显示登录页
-  // 如果密码正确，显示管理面板
+  // 默认密码
+  const correctPassword = env.ADMIN_PASSWORD || 'admin123';
 
   // 读取 HTML 文件
   const html = `
@@ -29,10 +34,10 @@ export async function onRequest(context) {
     input:focus { outline: none; border-color: #667eea; }
     button { width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.8rem; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: transform 0.2s; }
     button:hover { transform: translateY(-2px); }
-    .hint { margin-top: 1rem; color: #666; font-size: 0.85rem; }
-    .error { color: #dc3545; margin-bottom: 1rem; display: none; }
-    /* 管理面板样式 (内联以简化) */
-    .admin-panel { display: none; text-align: left; }
+    .hint { margin-top: 1rem; color: #666; font-size: 0.85rem; line-height: 1.5; }
+    .error { color: #dc3545; margin-bottom: 1rem; display: none; background: #ffe6e6; padding: 0.5rem; border-radius: 4px; }
+    /* 管理面板样式 */
+    .admin-panel { display: none; text-align: left; max-width: 900px !important; }
     .source-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #eee; }
     .source-item:last-child { border-bottom: none; }
     .source-info { flex: 1; }
@@ -54,12 +59,12 @@ export async function onRequest(context) {
     <span class="icon">🔒</span>
     <h1>TVBox 源管理</h1>
     <div id="loginError" class="error">密码错误，请重试</div>
-    <input type="password" id="passwordInput" placeholder="请输入管理员密码">
+    <input type="password" id="passwordInput" placeholder="请输入管理员密码" onkeydown="if(event.key==='Enter') checkPassword()">
     <button onclick="checkPassword()">登录</button>
-    <div class="hint">默认密码：<strong>admin123</strong><br>(可在 Cloudflare 环境变量中修改 ADMIN_PASSWORD)</div>
+    <div class="hint">默认密码：<strong>admin123</strong><br><small>(可在 Cloudflare 环境变量中修改 ADMIN_PASSWORD)</small></div>
   </div>
 
-  <div class="card admin-panel" id="adminPanel" style="max-width: 900px;">
+  <div class="card admin-panel" id="adminPanel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
       <h1 style="margin:0;">📺 TVBox 源管理</h1>
       <button onclick="logout()" style="width:auto; background:#6c757d;">退出登录</button>
@@ -86,20 +91,15 @@ export async function onRequest(context) {
   </div>
 
   <script>
-    const DEFAULT_PWD = 'admin123'; // 前端默认值，仅用于演示，实际校验在后端
-    
-    // 检查 URL 中的密码参数
+    // 初始化检查
     const urlParams = new URLSearchParams(window.location.search);
-    const pwd = urlParams.get('password');
+    const pwdParam = urlParams.get('password');
+    const storedPwd = localStorage.getItem('tvbox_admin_pwd');
     
-    if (pwd) {
-      verifyAndShow(pwd);
-    } else {
-      // 检查本地存储
-      const storedPwd = localStorage.getItem('tvbox_admin_pwd');
-      if (storedPwd) {
-        verifyAndShow(storedPwd);
-      }
+    if (pwdParam) {
+      verifyAndShow(pwdParam);
+    } else if (storedPwd) {
+      verifyAndShow(storedPwd);
     }
 
     function checkPassword() {
@@ -109,13 +109,12 @@ export async function onRequest(context) {
     }
 
     async function verifyAndShow(pwd) {
-      // 简单验证：尝试获取源列表，如果成功说明密码可能正确（或者未设置密码）
-      // 实际生产环境应在后端验证
       try {
-        const res = await fetch('/api/sources?password=' + pwd);
+        const res = await fetch('/api/sources?password=' + encodeURIComponent(pwd));
         if (res.ok) {
           const data = await res.json();
-          if (!data.error) {
+          // 如果没有 error 字段，说明成功
+          if (data.error === undefined || data.error === null) {
             localStorage.setItem('tvbox_admin_pwd', pwd);
             showAdminPanel();
             loadSources(pwd);
@@ -124,15 +123,18 @@ export async function onRequest(context) {
         }
       } catch(e) {}
       
-      document.getElementById('loginError').style.display = 'block';
+      // 验证失败
+      const errEl = document.getElementById('loginError');
+      errEl.style.display = 'block';
+      errEl.textContent = '密码错误，请重试';
       document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordInput').focus();
     }
 
     function showAdminPanel() {
       document.getElementById('loginCard').style.display = 'none';
-      const panel = document.getElementById('adminPanel');
-      panel.style.display = 'block';
-      // 移除 URL 中的密码参数，保持整洁
+      document.getElementById('adminPanel').style.display = 'block';
+      // 清理 URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -144,7 +146,7 @@ export async function onRequest(context) {
     async function loadSources(pwd) {
       const urlPwd = pwd || localStorage.getItem('tvbox_admin_pwd') || '';
       try {
-        const res = await fetch('/api/sources?password=' + urlPwd);
+        const res = await fetch('/api/sources?password=' + encodeURIComponent(urlPwd));
         const data = await res.json();
         const list = document.getElementById('sourceList');
         
@@ -155,6 +157,7 @@ export async function onRequest(context) {
         
         list.innerHTML = data.sources.map(s => {
           const isActive = data.active === s.url;
+          const urlEscaped = s.url.replace(/'/g, "\\'").replace(/"/g, '&quot;');
           return \`
             <div class="source-item">
               <div class="source-info">
@@ -166,14 +169,14 @@ export async function onRequest(context) {
                 <div class="source-url">\${escapeHtml(s.url)}</div>
               </div>
               <div class="btn-group">
-                \${!isActive ? '<button class="btn-activate" onclick="activateSource(\\\''+s.url.replace(/'/g, "\\'")+'\\\')">激活</button>' : ''}
+                \${!isActive ? '<button class="btn-activate" onclick="activateSource(\\''+urlEscaped+'\\')">激活</button>' : ''}
                 <button class="btn-delete" onclick="deleteSource(\${s.id})">删除</button>
               </div>
             </div>
           \`;
         }).join('');
       } catch (e) {
-        document.getElementById('sourceList').innerHTML = '<p style="color:#dc3545;text-align:center;">加载失败</p>';
+        document.getElementById('sourceList').innerHTML = '<p style="color:#dc3545;text-align:center;">加载失败，请检查网络或重新登录</p>';
       }
     }
 
@@ -184,7 +187,7 @@ export async function onRequest(context) {
       
       const pwd = localStorage.getItem('tvbox_admin_pwd') || '';
       try {
-        const res = await fetch('/api/sources?password=' + pwd, {
+        const res = await fetch('/api/sources?password=' + encodeURIComponent(pwd), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name || 'Source', url }),
@@ -202,14 +205,16 @@ export async function onRequest(context) {
     async function activateSource(url) {
       const pwd = localStorage.getItem('tvbox_admin_pwd') || '';
       try {
-        await fetch('/api/activate?password=' + pwd, {
+        const res = await fetch('/api/activate?password=' + encodeURIComponent(pwd), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url }),
         });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
         loadSources();
       } catch (e) {
-        alert('激活失败');
+        alert('激活失败：' + e.message);
       }
     }
 
@@ -217,10 +222,12 @@ export async function onRequest(context) {
       if (!confirm('确定删除此源？')) return;
       const pwd = localStorage.getItem('tvbox_admin_pwd') || '';
       try {
-        await fetch('/api/sources/' + id + '?password=' + pwd, { method: 'DELETE' });
+        const res = await fetch('/api/sources/' + id + '?password=' + encodeURIComponent(pwd), { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
         loadSources();
       } catch (e) {
-        alert('删除失败');
+        alert('删除失败：' + e.message);
       }
     }
 
@@ -231,7 +238,7 @@ export async function onRequest(context) {
       try {
         let rawUrl = input.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/').replace('/tree/', '/');
         const testRes = await fetch(rawUrl);
-        if (!testRes.ok) throw new Error('无法访问该地址');
+        if (!testRes.ok) throw new Error('无法访问该地址，请检查链接是否正确');
         const json = await testRes.json();
         if (!json.spider && !json.sites && !json.home) throw new Error('不是有效的 TVBox 配置文件');
         
@@ -244,6 +251,7 @@ export async function onRequest(context) {
     }
 
     function escapeHtml(text) {
+      if (!text) return '';
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
@@ -254,6 +262,9 @@ export async function onRequest(context) {
   `;
 
   return new Response(html, {
-    headers: { 'Content-Type': 'text/html;charset=utf-8' },
+    headers: { 
+      'Content-Type': 'text/html;charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    },
   });
 }
